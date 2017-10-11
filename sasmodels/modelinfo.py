@@ -766,7 +766,7 @@ def make_model_info(kernel_module):
     info.opencl = getattr(kernel_module, 'opencl', not callable(info.Iq))
     info.single = getattr(kernel_module, 'single', not callable(info.Iq))
     info.random = getattr(kernel_module, 'random', None)
-
+    info.futhark_path = getattr(kernel_module, 'futhark_path', None)
     # multiplicity info
     control_pars = [p.id for p in parameters.kernel_parameters if p.is_control]
     default_control = control_pars[0] if control_pars else None
@@ -874,6 +874,8 @@ class ModelInfo(object):
     #: followed by the files that use those functions.  Form factors are
     #: indicated by providing a :attr:`ER` function.
     source = None           # type: List[str]
+    #: Defines the futhark kernel path relative to the model info file
+    futhark_path = None  # type: string
     #: The set of tests that must pass.  The format of the tests is described
     #: in :mod:`model_test`.
     tests = None            # type: List[TestCondition]

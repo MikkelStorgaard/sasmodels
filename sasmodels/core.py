@@ -21,6 +21,7 @@ from . import product
 from . import mixture
 from . import kernelpy
 from . import kerneldll
+from . import kernelfut
 from . import custom
 
 if os.environ.get("SAS_OPENCL", "").lower() == "none":
@@ -229,7 +230,11 @@ def build_model(model_info, dtype=None, platform="ocl"):
     numpy_dtype, fast, platform = parse_dtype(model_info, dtype, platform)
 
     source = generate.make_source(model_info)
-    if platform == "dll":
+
+    if type(model_info.Iq) is dict and model_info.Iq["model_is_futhark"]:
+        return kernelfut.FutModel(model_info, numpy_dtype)
+
+    elif platform == "dll":
         #print("building dll", numpy_dtype)
         return kerneldll.load_dll(source['dll'], model_info, numpy_dtype)
     else:
