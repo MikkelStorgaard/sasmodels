@@ -36,12 +36,11 @@ class FutModel(KernelModel):
     """
     def __init__(self, model_info, dtype):
         # Make sure Iq and Iqxy are available and vectorized
-        #_create_default_functions(model_info)
         self.info = model_info
         self.dtype = dtype
 
     def make_kernel(self, q_vectors):
-        logging.info("creating python kernel " + self.info.name)
+        logging.info("Initialising Futhark kernel " + self.info.name)
         q_input = GpuInput(q_vectors, dtype=self.dtype)
         kernel = self.info.Iqxy if q_input.is_2d else self.info.Iq
         return FutKernel(kernel, self.info, q_input)
@@ -124,7 +123,7 @@ class FutKernel(Kernel):
         dtype = self.dtype
         total_path = "%s/%s" % (MODELS_FOLDER, model_path)
         _class = load_source(model_name, total_path)
-        self.futhark_kernel = getattr(_class, model_name)(num_groups=4, group_size=32)
+        self.futhark_kernel = getattr(_class, model_name)()
         queue = self.futhark_kernel.queue
 
         if q_input.is_2d:
@@ -148,14 +147,6 @@ class FutKernel(Kernel):
                      else np.float64 if dtype == F64
         else np.float16 if dtype == F16
         else np.float32)  # will never get here, so use np.float32
-
-        ## GET MONO
-        parameters = self.info.parameters
-
-
-
-        # create call_details, values, is_magnetic
-        # call_details, values, is_magnetic = make_kernel_args(calculator, vw_pairs)
 
 
     def __call__(self, call_details, values, cutoff, magnetic):
@@ -281,57 +272,3 @@ def _loops(parameters, form, form_volume, nq, call_details, values, cutoff):
     scale = values[0]/(pd_norm if pd_norm != 0.0 else 1.0)
     background = values[1]
     return scale*total + background
-
-
-def _create_default_functions(model_info):
-    """
-    Autogenerate missing functions, such as Iqxy from Iq.
-
-    This only works for Iqxy when Iq is written in python. :func:`make_source`
-    performs a similar role for Iq written in C.  This also vectorizes
-    any functions that are not already marked as vectorized.
-    """
-    _create_vector_Iq(model_info)
-    _create_vector_Iqxy(model_info)  # call create_vector_Iq() first
-
-
-def _create_vector_Iq(model_info):
-    """
-    Define Iq as a vector function if it exists.
-    """
-    Iq = model_info.Iq
-    if callable(Iq) and not getattr(Iq, 'vectorized', False):
-        #print("vectorizing Iq")
-        def vector_Iq(q, *args):
-            """
-            Vectorized 1D kernel.
-            """
-            return np.array([Iq(qi, *args) for qi in q])
-        vector_Iq.vectorized = True
-        model_info.Iq = vector_Iq
-
-def _create_vector_Iqxy(model_info):
-    """
-    Define Iqxy as a vector function if it exists, or default it from Iq().
-    """
-    Iq, Iqxy = model_info.Iq, model_info.Iqxy
-    if callable(Iqxy):
-        if not getattr(Iqxy, 'vectorized', False):
-            #print("vectorizing Iqxy")
-            def vector_Iqxy(qx, qy, *args):
-                """
-                Vectorized 2D kernel.
-                """
-                return np.array([Iqxy(qxi, qyi, *args) for qxi, qyi in zip(qx, qy)])
-            vector_Iqxy.vectorized = True
-            model_info.Iqxy = vector_Iqxy
-    elif callable(Iq):
-        #print("defaulting Iqxy")
-        # Iq is vectorized because create_vector_Iq was already called.
-        def default_Iqxy(qx, qy, *args):
-            """
-            Default 2D kernel.
-            """
-            return Iq(np.sqrt(qx**2 + qy**2), *args)
-        default_Iqxy.vectorized = True
-        model_info.Iqxy = default_Iqxy
