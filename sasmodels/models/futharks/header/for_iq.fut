@@ -13,14 +13,13 @@ module for_iq (for_iq: (real: real) -> (has_iq with dtype = real.t))
   let run_kernel(num_pars: i32, num_active: i32, nq : i32, call_details_num_evals: i32, call_details_buffer : []i32,
                  values : []dtype, q_input : []dtype, cutoff : dtype): []dtype =
 
-    let scale = values[0]
     let background = values[1]
     let parameters = values[ 2: num_pars+2 ]
     let scatterings = map (\q -> Iq.Iq q parameters) q_input
     in if (num_active == 0)
        then
     let pd_norm = Iq.form_volume parameters
-        let scale' = real.(scale / pd_norm)
+        let scale = real.(if pd_norm == (from_i32 0) then values[0] else values[0]/pd_norm)
         let res = map (\(r:dtype) : dtype ->
                        let out = real.(scale*r + background)
                        in out
@@ -28,6 +27,7 @@ module for_iq (for_iq: (real: real) -> (has_iq with dtype = real.t))
         in res[0:nq]
       else
 
+    let scale = values[0]
     let spherical_correction = real.from_i32(1)
     let weight0 = real.from_i32(1)
 
@@ -55,20 +55,20 @@ module for_iq (for_iq: (real: real) -> (has_iq with dtype = real.t))
   let run_kernel_2d(num_pars: i32, num_active: i32, nq : i32, call_details_num_evals: i32, call_details_buffer : []i32,
                    values : []dtype, qx_input : []dtype, qy_input : []dtype, cutoff : dtype): []dtype =
 
-    let scale = values[0]
     let background = values[1]
     let parameters = values[2:num_pars+2]
     let scatterings = map (\qx qy -> Iq.Iqxy qx qy parameters) qx_input qy_input
     in if (num_active == 0)
        then
     let pd_norm = Iq.form_volume parameters
-    let scale' = real.(scale / pd_norm)
+    let scale = real.(if pd_norm == (from_i32 0) then values[0] else values[0]/pd_norm)
     let res = map (\(r:dtype) : dtype ->
                    let out = real.(scale*r + background)
                    in out
                   ) scatterings
     in res[0:nq]
        else
+    let scale = values[0]
     let pd_value = values[2+num_pars : 2+num_pars]
     let weight0 = real.from_i32(1)
     
